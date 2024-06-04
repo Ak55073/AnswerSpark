@@ -1,0 +1,158 @@
+=====================================================TRY OUTS=====================================================
+
+BASIC TRY
+
+case class CompanyOrdersClass(OrderID:String, CompanyID:String, CompanyName:String, CompanyLocation:String, ComponentToBeManufactured:String, Quantity:Long, EstimatedCost:Double, OrderDate:String, DueDate:String, CompletionStatus:String, DeliveryStatus:String);
+
+val companyOrders = sc.textFile().map(f=>f.split(",")).map(r=>(CompanyOrdersClass(r(0),r(1),r(2),r(3),r(4),r(5).toLong,r(6).toDouble,r(7),r(8),r(9),r(10))))
+
+case class CompanyInfoClass(CompanyID:String, CompanyName:String, CompanyLocation:String, CompanyAddress:String, CompanyContact:Long, ProfitMargin:Double, EstablishedYear:Int);
+
+val companyInfo = sc.textFile().map(f=>f.split(",")).map(r=>(CompanyInfoClass(r(0),r(1),r(2),r(3),r(4).toLong,r(5).toDouble,r(6).toInt)))
+
+3.
+val companyOrdersDF = companyOrders.toDF()
+val companyInfoDF = companyInfo.toDF()
+
+companyOrdersDF.createTempView("orders");
+companyInfoDF.createTempView("info");
+
+4.
+spark.sql("SELECT * FROM info WHERE EstablishedYear <= year(current_date()) - 20").show()
+
+5.
+val pairedCompanyOrders =  companyOrders.map(r=>(r.CompanyID, r))
+val pairedCompanyInfo =  companyInfo.map(r=>(r.CompanyID, r))
+
+pairedCompanyOrders.join(pairedCompanyInfo).collect().filter(r=> r._2._1.ComponentToBeManufactured == "Shock Absorber").reduce((r1, r2) => { if (r1._2._2.ProfitMargin > r2._2._2.ProfitMargin) r1 else r2})._2._2.CompanyName
+
+6.
+companyOrders.filter(r=> r.ComponentToBeManufactured == "Fender").map(r=>r.CompanyName).distinct().count()
+
+7.
+spark.sql("SELECT ComponentToBeManufactured, CompanyLocation, Quantity FROM orders WHERE (ComponentToBeManufactured = 'Exhaust Pipes') and (CompanyLocation = 'North Carolina')").show()
+
+8.
+companyOrders.filter(r=> r.CompletionStatus == "Completed" && r.DeliveryStatus == "Pending").count()
+
+9.
+val discountedPrice = spark.sql("SELECT *, (EstimatedCost - (EstimatedCost*0.1)) as NewPrice FROM orders WHERE CompletionStatus = 'Pending'").collect()
+
+discountedPrice.saveAsTextFile("hdfs://localhost:9001/user/spark/FilterOutput")
+
+10.
+val answer: BigDecimal = discountedPrice.filter(r=> r(2) == "Laser Wheels").map(r=>r(11).toString.toDouble).sum
+
+MEDIUM TRY
+
+case class PatientRegistrationClass(RegNo: String, PatientName: String, Age: String, DBO: String, Gender: String, BloodG: String, Department: String, Doctor: String, InsuranceId: String, BackgroundStatus: String, DischargeApproval: String)
+
+case class CompanyInsuranceClass(CompanyName: String, InsuranceId: String, PercentCover: Int, Limit: Long)
+
+case class BillDateClass(RegNo: String, AmountPaid: Long, TotalAmount: Long)
+
+val patientRegistrationRDD = sc.textFile().map(f=>f.split(",")).map(r=>(PatientRegistrationClass(r(0),r(1),r(2),r(3),r(4),r(5),r(6),r(7),r(8),r(9),r(10))))
+
+val companyInsuranceRDD = sc.textFile().map(f=>f.split(",")).map(r=>(CompanyInsuranceClass(r(0),r(1),r(2).toInt,r(3).toLong)))
+
+val billDateRDD = sc.textFile().map(f=>f.split("\t")).map(r=>(BillDateClass(r(0),r(1).toLong,r(2).toInt)))
+
+2.
+val patientToBeDischargedRDD = patientRegistrationRDD.filter(r=> r.BackgroundStatus == "COMPLETED" & r.DischargeApproval == "POSITIVE")
+
+3.
+val patientRegistrationDF = patientRegistrationRDD.toDF()
+val companyInsuranceDF = companyInsuranceRDD.toDF()
+val billDateDF = billDateRDD.toDF()
+val patientToBeDischargedDF = patientToBeDischargedRDD.toDF()
+
+4.
+patientToBeDischargedDF.filter($"RegNo"===18).join(companyInsuranceDF, Seq("InsuranceId")).show()
+
+5.
+val ApprovedDf = patientRegistrationDF.filter($"BackgroundStatus"==="COMPLETED" && $"DischargeApproval"==="POSITIVE").join(companyInsuranceDF, Seq("InsuranceId"))
+
+6.
+val AmountDueDF = ApprovedDf.join(billDateDF, Seq("RegNo")).withColumn("RemainingAmount", col("TotalAmount") - col("AmountPaid")).select("RegNo", "PatientName", "CompanyName", "InsuranceId", "RemainingAmount")
+
+7.
+val AmountCoveredByIns = AmountDueDF
+.join(companyInsuranceDF, Seq("InsuranceId", "CompanyName"))
+.withColumn("AmountCovered", col("RemainingAmount") * (col("PercentCover") / 100.0))
+.withColumn("AmountCovered", when(col("AmountCovered") < col("Limit"), col("AmountCovered")).otherwise(col("Limit")))
+.select("RegNo", "PatientName", "CompanyName", "InsuranceId", "RemainingAmount", "AmountCovered")
+
+8.
+val billData = AmountCoveredByIns
+.withColumn("FinalAmount", col("RemainingAmount") - col("AmountCovered"))
+.select("RegNo", "PatientName", "CompanyName", "AmountCovered", "FinalAmount")
+
+9.
+val finalData = billData
+.join(patientRegistrationDF, Seq("RegNo", "PatientName"))
+.select("RegNo", "PatientName", "Age", "DBO", "Gender", "BloodG", "Department", "Doctor", "CompanyName", "AmountCovered", "FinalAmount")
+
+10.
+finalData.groupBy("CompanyName").agg(sum("AmountCovered").as("CostToCompany")).show()
+
+COMPLEX TRY
+
+case class CabData(cabid:String, drivername:String, cabtype:String, nooftrips:Long, avgrating:Double)
+
+case class PassengerData(Passenger_id: String, Passenger_name: String, Contact: String, Email: String, Avg_rating: Double, Saved_location1: String, Saved_location2: String, Saved_location3: String, Saved_location4: String, Saved_location5: String)
+
+case class TransactionData(transactionid: String, passengerid: String, cabid: String, typebooked: String, typealloted: String, Transaction_date: String, timestamp: String, source:String, destination: String, rating: Double, price: Double, couponcode: String, traveltime: Int, waittime: Int)
+
+val cabData = spark.read.json().as[CabData]
+
+val passengerData = spark.read.option("header","true").option("inferSchema","true").csv().as[PassengerData]
+
+val transactionData = sc.textFile().map(f=>f.split(",")).map(r=>(TransactionData(r(0),r(1),r(2),r(3),r(4),r(5),r(6),r(7),r(8),r(9).toDouble,r(10).toDouble,r(11),r(12).toInt,r(13).toInt))).toDF()
+
+cabData.createTempView("cabdata");
+passengerData.createTempView("passdata");
+transactionData.createTempView("transdata");
+
+2.
+spark.sql("SELECT passengerid, COUNT(*) as TripCount FROM transdata WHERE (Transaction_date LIKE '3/%/2020') GROUP BY passengerid ORDER BY TripCount DESC LIMIT 1").show()
+
+transactionData.filter($"Transaction_date".like("3/%/2020")).groupBy("passengerid").agg(sum(lit(1)).as("TripCount")).orderBy($"TripCount".desc).limit(1).show()
+
+3.
+val countedTrip = transactionData.groupBy("passengerid", "source", "destination").agg(count("*").as("TripCount"));
+
+val maxCountedTrip = countedTrip.groupBy("passengerid").agg(max("TripCount").as("MaxTripCount"));
+
+val requiredTripDataUnnamed = countedTrip.join(maxCountedTrip, Seq("passengerid")).filter($"TripCount"===$"MaxTripCount").select("passengerid", "source", "destination")
+
+val requiredTripData = requiredTripDataUnnamed.withColumnRenamed("source", "favoriteSource").withColumnRenamed("destination", "favoriteDestination")
+
+val finalData = transactionData.join(requiredTripData, Seq("passengerid"), "left")
+
+4.
+transactionData.groupBy("source").agg(avg($"waittime").as("Average Wait")).orderBy($"Average Wait".desc).limit(5).show();
+
+5.
+NEED ECLIPSE IDE
+
+6. Probably Wrong
+transactionData.write.parquet()
+
+
+7.
+val transactionDataRDD = transactionData.rdd
+
+val outerData = transactionData.filter($"Transaction_date".like("3/%/2020")).select("passengerid").withColumnRenamed("passengerid", "Passenger_id")
+passengerData.join(outerData, Seq("Passenger_id"), "left_outer").select("Passenger_id").distinct().show()
+
+8.
+NEED ECLIPSE IDE
+
+9.
+val passengerDataRDD = passengerData.rdd
+val ageCounter = sc.longAccumulator("Age Counter");
+passengerDataRDD.foreach { line =>
+	if(line.Avg_rating < 2.5) 
+		ageCounter.add(1)
+}
+println("Passengers Count: " + ageCounter.value)
