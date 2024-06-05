@@ -35,12 +35,13 @@ spark.sql("SELECT ComponentToBeManufactured, CompanyLocation, Quantity FROM orde
 companyOrders.filter(r=> r.CompletionStatus == "Completed" && r.DeliveryStatus == "Pending").count()
 
 9.
-val discountedPrice = spark.sql("SELECT *, (EstimatedCost - (EstimatedCost*0.1)) as NewPrice FROM orders WHERE CompletionStatus = 'Pending'").collect()
+val discountedPriceRDD = spark.sql("SELECT *, (EstimatedCost - (EstimatedCost*0.1)) as NewPrice FROM orders WHERE CompletionStatus = 'Pending'").rdd
 
-discountedPrice.saveAsTextFile("hdfs://localhost:9001/user/spark/FilterOutput")
+discountedPriceRDD.saveAsTextFile("hdfs://localhost:9001/user/spark/FilterOutput")
 
 10.
-val answer: BigDecimal = discountedPrice.filter(r=> r(2) == "Laser Wheels").map(r=>r(11).toString.toDouble).sum
+// SUM WILL NOT WORK WITHOUT [.toString.toDouble] as by Default datatype is Array[Any]
+val answer: BigDecimal = discountedPriceRDD.filter(r=> r(2) == "Laser Wheels").map(r=>r(11).toString.toDouble).sum
 
 MEDIUM TRY
 
