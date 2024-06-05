@@ -1,5 +1,4 @@
 =====================================================TRY OUTS=====================================================
-
 BASIC TRY
 
 case class CompanyOrdersClass(OrderID:String, CompanyID:String, CompanyName:String, CompanyLocation:String, ComponentToBeManufactured:String, Quantity:Long, EstimatedCost:Double, OrderDate:String, DueDate:String, CompletionStatus:String, DeliveryStatus:String);
@@ -156,3 +155,31 @@ passengerDataRDD.foreach { line =>
 		ageCounter.add(1)
 }
 println("Passengers Count: " + ageCounter.value)
+
+
+/*==========================================SPARK CAPSTONE==========================================*/
+
+case class CardClass(CustomerName:String, DOB:String, SSN:String, MailID:String, PhoneNumber:Long, City:String, State:String, ZipCode:String, CreditLimit:Long)
+
+case class CustomerClass(
+CustomerName:String, DOB:String, SSN:String, City:String, State:String, ZipCode:Long, ExistingProducts:String, OtherBankProducts1:String, CreditSpent1:Long, OtherBankProducts2:String, CreditSpent2:Long, OtherBankProducts3:String, CreditSpent3:Long, DefaulterFlag:String)
+
+val cardRDD = sc.textFile().map(f=>f.split(",")).map(r=>(CardClass(r(0),r(1),r(2),r(3),r(4).toLong,r(5),r(6),r(7),r(8).toLong)))
+
+val customerRDD = sc.textFile().map(f=>f.split(",")).map(r=>(CustomerClass(	r(0),r(1),r(2),r(3),r(4),r(5).toLong,r(6),r(7),r(8).toLong,r(9),r(10).toLong,r(11),r(12).toLong,r(13))))
+
+val cardDF = cardRDD.toDF()
+val customerDF = customerRDD.toDF()
+
+cardDF.createTempView("cards");
+customerDF.createTempView("customers");
+
+--
+1.
+spark.sql("SELECT CustomerName FROM customers WHERE DefaulterFlag=='Y'").show()
+
+2.
+spark.sql("SELECT (CreditSpent1+CreditSpent2+CreditSpent3) as TotalSpent, CreditLimit, CASE WHEN (CreditSpent1+CreditSpent2+CreditSpent3) <= CreditLimit THEN 'Under Limit' ELSE 'Over Limit' END as Status FROM customers JOIN cards ON customers.SSN = cards.SSN").show()
+
+3 & 4.
+val refrenceAproved = cardDF.join(customerDF, Seq("SSN")).withColumn("ApproveStatus", when((($"CreditSpent1"+$"CreditSpent2"+$"CreditSpent3") < $"CreditLimit") && ($"DefaulterFlag" === "N"), "Approved").otherwise("Rejected"))
