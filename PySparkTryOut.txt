@@ -1,0 +1,84 @@
+/*==========================================SPARK PYTHON TRYOUTS===========================================*/
+
+from collections import namedtuple
+
+1.
+OrderBookTuple = namedtuple('OrderBook', ['OrderID','CompanyID','partsRequired','OrderQuantity','CostOfPart','OrderDate','ExpectedDeliveryDate','DeliveryStatus'])
+
+CompanyDetailsTuple = namedtuple('CompanyDetails', ['CompanyID','CompanyName','CompanyLocation','CompanyContact','EstablishedYear'])
+
+2.
+orderBookRDD = sc.textFile().map(lambda line :line.split(",")).map(lambda c : OrderBookTuple(c[0],c[1],c[2],int(c[3]),float(c[4]),c[5],c[6],c[7]))
+
+companyDetailsRDD = sc.textFile().map(lambda line :line.split(",")).map(lambda c : CompanyDetailsTuple(c[0],c[1],c[2],int(c[3]),int(c[4])))
+
+pairedOrderBookRDD = orderBookRDD.map(lambda x: (x.CompanyID, x))
+pairedCompanyDetailsRDD = companyDetailsRDD.map(lambda x: (x.CompanyID, x))
+
+3.
+orderBookDF = orderBookRDD.toDF()
+companyDetailsDF = companyDetailsRDD.toDF()
+
+orderBookDF.createTempView("orders");
+companyDetailsDF.createTempView("company");
+
+4.
+spark.sql("SELECT * FROM company WHERE int(EstablishedYear) <  (int(year(current_date())) - 15)").show()
+
+5.
+pairedOrderBookRDD.join(pairedCompanyDetailsRDD).filter(lambda x: x[1][0].partsRequired=="Brakes").map(lambda x: x[1][1])
+
+6.
+spark.sql("SELECT sum(OrderQuantity) FROM orders JOIN company ON orders.CompanyID = company.CompanyID WHERE (CompanyLocation='New York') and (partsRequired='Exhaust Pipes')").show()
+
+7.
+orderBookRDD.filter(lambda x: x.DeliveryStatus == "Delivered").map(lambda x:x.OrderQuantity).sum()
+
+8.
+spark.sql("SELECT sum(OrderQuantity) FROM orders WHERE DeliveryStatus='Pending'").show()
+
+9.
+spark.sql("SELECT sum(OrderQuantity), sum(CAST(CostOfPart as BigInt)) FROM orders JOIN company ON orders.CompanyID = company.CompanyID WHERE CompanyLocation='North Carolina'").show()
+
+10.
+spark.sql("SELECT CompanyName, OrderDate, ExpectedDeliveryDate FROM orders JOIN company ON orders.CompanyID = company.CompanyID WHERE partsRequired='Exhaust Pipes'").show()
+
+/*==========================================SPARK PYTHON CAPSTONE==========================================*/
+Task 1:
+
+from collections import namedtuple
+
+A.
+hdfs dfs -put <path> /user/pyspark
+
+C.
+applicationDataRDD = sc.textFile("hdfs://localhost:9001/user/pyspark/HomeLoanApplicationData.csv")
+referenceDataRDD = sc.textFile("hdfs://localhost:9001/user/pyspark/ClientReferenceDataset.csv")
+
+D.
+applicationDataTuple = namedtuple('ApplicationData', ['CustomerName','DOB','UIN','MailID','PhoneNumber','City','State','LivingStatus','PinCode','LoanAmount'])
+
+applicationDF = applicationDataRDD.map(lambda line :line.split(",")).map(lambda c : applicationDataTuple(c[0],c[1],c[2],c[3],int(c[4]),c[5],c[6],c[7],int(c[8]),c[9])).toDF()
+
+referenceDataTuple = namedtuple('ReferenceData', ['CustomerName','DOB','UIN','City','State','PinCode','CibilScore','DefaulterFlag'])
+
+referenceDF = referenceDataRDD.map(lambda line :line.split(",")).map(lambda c : referenceDataTuple(c[0],c[1],c[2],c[3],c[4],int(c[5]),int(c[6]),c[7])).toDF()
+
+Task 2:
+
+1.
+referenceDF.filter(referenceDF.DefaulterFlag == "Y").show()
+
+2.
+applicationDF.groupBy("LivingStatus").count()
+
+3.
+from pyspark.sql.functions import when
+
+refrenceAproved = referenceDF.withColumn("ApproveStatus", when((referenceDF.CibilScore > 800) & (referenceDF.DefaulterFlag == "N"), "Approved").otherwise("NotApproved"))
+
+5.
+refrenceAproved.join(applicationDF, refrenceAproved.UIN == applicationDF.UIN).select(refrenceAproved.UIN, refrenceAproved.CustomerName, refrenceAproved.ApproveStatus, applicationDF.LoanAmount).show()
+
+6.
+applicationDF.join(referenceDF, refrenceAproved.UIN == applicationDF.UIN).filter((applicationDF.LivingStatus == "BPL") & (referenceDF.DefaulterFlag == "N") & (referenceDF.CibilScore > 800)).show()
