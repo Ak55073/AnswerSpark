@@ -140,10 +140,15 @@ transactionData.write.parquet()
 
 
 7.
-val transactionDataRDD = transactionData.rdd
+val transactionDataRDD = transactionData.filter(!$"Transaction_date".like("4/%/2020")).rdd
+val paireddDataRDD = transactionDataRDD.map{r => (r(1), r(1))}
+val broadcastStates = sc.broadcast(paireddDataRDD.collect().toMap)
 
-val outerData = transactionData.filter($"Transaction_date".like("3/%/2020")).select("passengerid").withColumnRenamed("passengerid", "Passenger_id")
-passengerData.join(outerData, Seq("Passenger_id"), "left_outer").select("Passenger_id").distinct().show()
+val passengerDataRDD = passengerData.rdd
+
+val finaldata = passengerDataRDD.filter {record => (record.Passenger_id == broadcastStates.value.get(record.Passenger_id).getOrElse("1").toString)}
+
+finaldata.foreach(println)
 
 8.
 NEED ECLIPSE IDE
