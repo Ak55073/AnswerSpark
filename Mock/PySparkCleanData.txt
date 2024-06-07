@@ -1,0 +1,38 @@
+from collections import namedtuple
+
+------
+
+chaptersDF = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Chapters.csv")
+
+chaptersRDD = chaptersDF.rdd
+
+chaptersDF.createTempView("chaptersview");
+
+------
+
+charactersDF = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Characters.csv")
+
+charactersRDD = charactersDF.rdd
+
+charactersDF.createTempView("charactersview");
+
+------
+
+dialogueDF = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Dialogue.csv")
+
+dialogueRDD = dialogueDF.rdd
+
+dialogueDF.createTempView("dialogueview");
+
+------
+from pyspark.sql.functions import regexp_replace
+
+moviesRaw = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Movies.csv")
+
+correctedMoviesDF = moviesRaw.withColumn("Budget", regexp_replace("Budget", ",", "")).withColumn("Budget", regexp_replace("Budget", " ", "")).withColumn("Box Office", regexp_replace("Box Office", ",", "")).withColumn("Box Office", regexp_replace("Box Office", " ", ""))
+
+finalMoviesDF = correctedMoviesDF.withColumn("Budget", correctedMoviesDF["Budget"].cast("int")).withColumn("Box Office", correctedMoviesDF["Box Office"].cast("int"))
+
+moviesRDD = finalMoviesDF.rdd
+
+finalMoviesDF.createTempView("moviesview");

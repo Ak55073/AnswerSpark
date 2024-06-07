@@ -1,0 +1,46 @@
+case class ChaptersClass(`Chapter ID`:Int, `Chapter Name`:String, `Movie ID`:Int, `Movie Chapter`:Int);
+
+val chaptersDF = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Chapters.csv").as[ChaptersClass].toDF()
+
+val chaptersRDD = chaptersDF.rdd
+
+chaptersDF.createTempView("chaptersview");
+
+--------------------------------------
+
+case class CharactersClass(`Character ID`:Int, `Character Name`:String, `Species`:String, `Gender`:String, `House`:String);
+
+val charactersDF = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Characters.csv").as[CharactersClass].toDF()
+
+val charactersRDD = charactersDF.rdd
+
+charactersDF.createOrReplaceTempView("charactersview");
+
+--------------------------------------
+
+case class DialogueClass(`Dialogue ID`:Int, `Chapter ID`:Int, `Character ID`:Int, `Dialogue`:String);
+
+val dialogueDF = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Dialogue.csv").as[DialogueClass].toDF()
+
+val dialogueRDD = dialogueDF.rdd
+
+charactersDF.createOrReplaceTempView("dialogueview");
+
+--------------------------------------
+import org.apache.spark.sql.types._
+
+case class MoviesClass(`Movie ID`:Int, `Movie Title`:String, `Release Year`:Int, `Runtime`:Int, `Budget`:String, `Box Office`:String);
+
+val moviesDF = spark.read.option("header","true").option("inferSchema","true").option("quote", "\"").option("escape", "\"").csv("C:/Users/abhinav.kumar62/Desktop/1350427/Input Files/Movies.csv").as[MoviesClass].toDF()
+
+val correctedMoviesDF = moviesDF
+.withColumn("Budget", regexp_replace($"Budget", ",", ""))
+.withColumn("Budget", regexp_replace($"Budget", " ", ""))
+.withColumn("Budget", col("Budget").cast(IntegerType))
+.withColumn("Box Office", regexp_replace($"Box Office", ",", ""))
+.withColumn("Box Office", regexp_replace($"Box Office", " ", ""))
+.withColumn("Box Office", col("Box Office").cast(IntegerType))
+
+val moviesRDD = correctedMoviesDF.rdd
+
+correctedMoviesDF.createOrReplaceTempView("moviesview");
