@@ -4,66 +4,76 @@ https://repo1.maven.org/maven2/com/crealytics/spark-excel_2.12/3.5.1_0.20.4/spar
 // [RUN CMD AS ADMIN] and Start Spark-shell with following
 spark-shell --jars "C:\Users\abhinav.kumar62\Downloads\spark-excel_2.12-3.5.1_0.20.4.jar"
 
--------------
-USE :paste for below
--------------
+// -------------
 
-val customerRAWDF = spark.read
+import java.sql.Date
+
+// -------------
+// USE :paste for commands below. COPYING AND PASTING MULTI-LINE COMMAND AT ONCE WILL NOT WORK
+// Don't be chandu
+// -------------
+
+val customerExcelData = spark.read
 	.format("com.crealytics.spark.excel")
 	.option("header", "true")
 	.option("inferSchema", "true")
 	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
-	.toDF()
 
-// OPTIONAL: TO REMOVE SPACES IN HEADER
-val customerDF = customerRAWDF
+val customerDF = customerExcelData
 	.withColumnRenamed("Customer ID", "CustomerID")
-	.withColumnRenamed("Purchase Date", "PurchaseDate")
+	.withColumn("PurchaseDate", to_date($"Purchase Date"))
+	.drop("Purchase Date")
 	.withColumnRenamed("Product ID", "ProductID")
 	.withColumnRenamed("Discount Applied", "DiscountApplied")
 
 customerDF.createTempView("customers");
-	  
-val customerRDD = customerDF.rdd
- 
--------------
-  
-val productRAWDF = spark.read
+
+case class CustomerClass(CustomerID:String, PurchaseDate:Date, ProductID:String, DiscountApplied:Double)
+
+val customerRDD = customerDF.as[CustomerClass].rdd
+
+// -------------
+
+val productExcelData = spark.read
 	.format("com.crealytics.spark.excel")
 	.option("header", "true")
 	.option("inferSchema", "true")
 	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
-	.toDF()
 
-// OPTIONAL: TO REMOVE SPACES IN HEADER
-val productDF = productRAWDF
+val productDF = productExcelData
 	.withColumnRenamed("Product ID", "ProductID")
 	.withColumnRenamed("Product Name", "ProductName")
 	.withColumnRenamed("Product Category", "ProductCategory")
 	.withColumnRenamed("Discount Applied", "DiscountApplied")
 	
 productDF.createTempView("products");
+
+case class ProductClass(ProductID:String, ProductName:String, ProductCategory:String, Price:Double, Rating:Double)
 	
-val productRDD = productDF.rdd
+val productRDD = productDF.as[ProductClass].rdd
  
--------------
+// -------------
   
-val trafficDF = spark.read
+val trafficCSVData = spark.read
 	.option("header","true")
 	.option("inferSchema","true")
 	.csv("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Website traffic and user behavior.csv")
 	.toDF()
 	
+val trafficDF = trafficCSVData.withColumn("Date", to_date($"Date"))
+	
 trafficDF.createTempView("traffics");
 
-val trafficRDD = trafficDF.rdd
+case class TrafficClass(Date:Date, PageViews:Int, UniqueVisitors:Int, BounceRate:Int, SessionDuration:Int)
 
--------------
+val trafficRDD = trafficDF.as[TrafficClass].rdd
+
+// -------------
 
 customerDF.printSchema
-
 productDF.printSchema
-
 trafficDF.printSchema
 
--------------
+customerRDD.take(5)
+productRDD.take(5)
+trafficRDD.take(5)
