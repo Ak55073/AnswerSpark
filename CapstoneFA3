@@ -1,0 +1,55 @@
+// Download this file
+https://repo1.maven.org/maven2/com/crealytics/spark-excel_2.12/3.5.1_0.20.4/spark-excel_2.12-3.5.1_0.20.4.jar
+
+// [RUN CMD AS ADMIN] and Start Spark-shell with following
+spark-shell --jars "C:\Users\abhinav.kumar62\Downloads\spark-excel_2.12-3.5.1_0.20.4.jar"
+
+-------------
+
+val customerDF = spark.read
+	.format("com.crealytics.spark.excel")
+	.option("header", "true")
+	.option("inferSchema", "true")
+	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
+	.toDF()
+
+customerDF.createTempView("customers");
+	  
+val customerRDD = customerDF.rdd
+ 
+-------------
+  
+val productDF = spark.read
+	.format("com.crealytics.spark.excel")
+	.option("header", "true")
+	.option("inferSchema", "true")
+	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
+	.toDF()
+	
+productDF.createTempView("products");
+	
+val productRDD = productDF.rdd
+ 
+-------------
+  
+val trafficDF = spark.read
+	.option("header","true")
+	.option("inferSchema","true")
+	.csv("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Website traffic and user behavior.csv")
+	.toDF()
+	
+trafficDF.createTempView("traffics");
+
+val trafficRDD = trafficDF.rdd
+
+-------------
+
+customerDF.printSchema
+
+productDF.printSchema
+
+trafficDF.printSchema
+
+NOTES: Header names have spaces in them, so will need to use backtick (`) for all queries.
+
+-------------
