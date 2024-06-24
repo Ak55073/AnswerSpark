@@ -5,13 +5,22 @@ https://repo1.maven.org/maven2/com/crealytics/spark-excel_2.12/3.5.1_0.20.4/spar
 spark-shell --jars "C:\Users\abhinav.kumar62\Downloads\spark-excel_2.12-3.5.1_0.20.4.jar"
 
 -------------
+USE :paste for below
+-------------
 
-val customerDF = spark.read
+val customerRAWDF = spark.read
 	.format("com.crealytics.spark.excel")
 	.option("header", "true")
 	.option("inferSchema", "true")
 	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
 	.toDF()
+
+// OPTIONAL: TO REMOVE SPACES IN HEADER
+val customerDF = customerRAWDF
+	.withColumnRenamed("Customer ID", "CustomerID")
+	.withColumnRenamed("Purchase Date", "PurchaseDate")
+	.withColumnRenamed("Product ID", "ProductID")
+	.withColumnRenamed("Discount Applied", "DiscountApplied")
 
 customerDF.createTempView("customers");
 	  
@@ -19,12 +28,19 @@ val customerRDD = customerDF.rdd
  
 -------------
   
-val productDF = spark.read
+val productRAWDF = spark.read
 	.format("com.crealytics.spark.excel")
 	.option("header", "true")
 	.option("inferSchema", "true")
 	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
 	.toDF()
+
+// OPTIONAL: TO REMOVE SPACES IN HEADER
+val productDF = productRAWDF
+	.withColumnRenamed("Product ID", "ProductID")
+	.withColumnRenamed("Product Name", "ProductName")
+	.withColumnRenamed("Product Category", "ProductCategory")
+	.withColumnRenamed("Discount Applied", "DiscountApplied")
 	
 productDF.createTempView("products");
 	
@@ -49,7 +65,5 @@ customerDF.printSchema
 productDF.printSchema
 
 trafficDF.printSchema
-
-NOTES: Header names have spaces in them, so will need to use backtick (`) for all queries.
 
 -------------
