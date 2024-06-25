@@ -77,3 +77,55 @@ trafficDF.printSchema
 customerRDD.take(5)
 productRDD.take(5)
 trafficRDD.take(5)
+
+
+=====================================================PY SPARK=====================================================
+// Download this [SAME AS ABOVE]
+https://repo1.maven.org/maven2/com/crealytics/spark-excel_2.12/3.5.1_0.20.4/spark-excel_2.12-3.5.1_0.20.4.jar
+
+// [RUN CMD AS ADMIN] and Start Spark-shell with following jar dependencies
+pyspark --jars "C:\Users\abhinav.kumar62\Downloads\spark-excel_2.12-3.5.1_0.20.4.jar"
+
+// -------------
+
+from pyspark.sql.functions import to_date, col
+
+// -------------
+
+customerExcelData = spark.read.format("com.crealytics.spark.excel").option("header", "true").option("inferSchema", "true").load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
+
+customerDF = customerExcelData.withColumnRenamed("Customer ID", "CustomerID").withColumn("PurchaseDate", to_date("Purchase Date")).drop("Purchase Date").withColumnRenamed("Product ID", "ProductID").withColumnRenamed("Discount Applied", "DiscountApplied")
+
+customerDF.createTempView("customers");
+
+customerRDD = customerDF.rdd
+
+// -------------
+
+productExcelData = spark.read.format("com.crealytics.spark.excel").option("header", "true").option("inferSchema", "true").load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
+
+productDF = productExcelData.withColumnRenamed("Product ID", "ProductID").withColumnRenamed("Product Name", "ProductName").withColumnRenamed("Product Category", "ProductCategory").withColumnRenamed("Discount Applied", "DiscountApplied")
+
+productDF.createTempView("products");
+	
+productRDD = productDF.rdd
+
+// -------------
+
+trafficCSVData = spark.read.option("header","true").option("inferSchema","true").csv("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Website traffic and user behavior.csv")
+	
+trafficDF = trafficCSVData.withColumn("Date", to_date("Date"))
+	
+trafficDF.createTempView("traffics");
+
+trafficRDD = trafficDF.rdd
+
+// -------------
+
+customerDF.printSchema
+productDF.printSchema
+trafficDF.printSchema
+
+customerRDD.take(5)
+productRDD.take(5)
+trafficRDD.take(5)
