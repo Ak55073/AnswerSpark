@@ -757,6 +757,7 @@ ans.show()
 // ================================================================ //
 
 3.
+// GROUPING on "ProductID", "ProductName" as ProductName is not unique alone
 newDF = (customerDF
     .join(productDF, on=["ProductID"])
     .join(trafficDF, col("Date") == col("PurchaseDate"))
