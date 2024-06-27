@@ -186,12 +186,32 @@ val ans_Q4 = trafficRDD
         row => row.Date
     }
 
-println("==Output Spark Core Q4==\nDates with highest Bounce Rate")
+println("==Output Spark Core Q4==\nDates with highest Bounce Rate of: " + highestBounceRate)
 ans_Q4.foreach(println)
+
+-----ALTERNATE-----
+
+val correctedBounceRate = trafficRDD
+	.map(row=>(row.Date, row.BounceRate))
+	.reduceByKey(_+_)
+	.sortBy(_._2, false)
+
+val highestBounceRateAlt = correctedBounceRate.first()._2
+
+val ans_Q4_alt = correctedBounceRate
+    .filter {
+        row => (row._2 == highestBounceRateAlt)
+    }
+    .map {
+        row => row._1
+    }
+
+println("==Output Spark Core Q4 ALT==\nDates with highest Bounce Rate of: " + highestBounceRateAlt)
+ans_Q4_alt.foreach(println)
 
 // ================================================================ //
 ==Output Spark Core Q4==
-Dates with highest Bounce Rate
+Dates with highest Bounce Rate of: 90
 2022-01-26
 2022-10-26
 2023-02-06
@@ -203,6 +223,12 @@ Dates with highest Bounce Rate
 2022-08-27
 2022-09-07
 2021-07-08
+// ================================================================ //
+
+// ================================================================ //
+==Output Spark Core Q4 ALT==
+Dates with highest Bounce Rate of: 306
+2021-08-15
 // ================================================================ //
 
 // 5.
