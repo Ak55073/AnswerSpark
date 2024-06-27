@@ -4,72 +4,88 @@ https://repo1.maven.org/maven2/com/crealytics/spark-excel_2.12/3.5.1_0.20.4/spar
 // [RUN CMD AS ADMIN] and Start Spark-shell with following
 spark-shell --jars "C:\Users\abhinav.kumar62\Downloads\spark-excel_2.12-3.5.1_0.20.4.jar"
 
-// -------------
+// --------------
 
+// Import necessary libraries for handling dates
 import java.sql.Date
 
-// -------------
-// USE :paste for commands below. COPYING AND PASTING MULTI-LINE COMMAND AT ONCE WILL NOT WORK
-// Don't be chandu
-// -------------
+// --------------
 
+// Loading data from Excel sheet -> USE :paste
 val customerExcelData = spark.read
-	.format("com.crealytics.spark.excel")
-	.option("header", "true")
-	.option("inferSchema", "true")
-	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
+  .format("com.crealytics.spark.excel")
+  .option("header", "true")
+  .option("inferSchema", "true")
+  .load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
 
+// Cleaning Phase -> USE :paste
 val customerDF = customerExcelData
-	.withColumnRenamed("Customer ID", "CustomerID")
-	.withColumn("PurchaseDate", to_date($"Purchase Date"))
-	.drop("Purchase Date")
-	.withColumnRenamed("Product ID", "ProductID")
-	.withColumnRenamed("Discount Applied", "DiscountApplied")
+  .withColumnRenamed("Customer ID", "CustomerID")
+  .withColumn("PurchaseDate", to_date($"Purchase Date"))
+  .drop("Purchase Date")
+  .withColumnRenamed("Product ID", "ProductID")
+  .withColumn("DiscountApplied", col("Discount Applied").cast("Float"))
+  .drop("Discount Applied")
 
-customerDF.createTempView("customers");
+// Creating SQL View
+customerDF.createOrReplaceTempView("customers")
 
-case class CustomerClass(CustomerID:String, PurchaseDate:Date, ProductID:String, DiscountApplied:Double)
+// Creating CaseClass to properly load RDD
+case class CustomerClass(CustomerID: String, PurchaseDate: Date, ProductID: String, DiscountApplied: Float)
 
+// Converting DataFrame to RDD using the defined case class
 val customerRDD = customerDF.as[CustomerClass].rdd
 
-// -------------
+// --------------
 
+// Loading data from Excel sheet -> USE :paste
 val productExcelData = spark.read
-	.format("com.crealytics.spark.excel")
-	.option("header", "true")
-	.option("inferSchema", "true")
-	.load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
+    .format("com.crealytics.spark.excel")
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
 
+// Clearning Phase -> USE :paste
 val productDF = productExcelData
-	.withColumnRenamed("Product ID", "ProductID")
-	.withColumnRenamed("Product Name", "ProductName")
-	.withColumnRenamed("Product Category", "ProductCategory")
-	.withColumnRenamed("Discount Applied", "DiscountApplied")
-	
+    .withColumnRenamed("Product ID", "ProductID")
+    .withColumnRenamed("Product Name", "ProductName")
+    .withColumnRenamed("Product Category", "ProductCategory")
+    .withColumnRenamed("Discount Applied", "DiscountApplied")
+    .withColumn("Price", col("Price").cast("Float"))
+    .withColumn("Rating", col("Rating").cast("Float"))
+
+// Creating SQL View
 productDF.createTempView("products");
 
-case class ProductClass(ProductID:String, ProductName:String, ProductCategory:String, Price:Double, Rating:Double)
-	
+// Creating CaseClass to properly load RDD
+case class ProductClass(ProductID:String, ProductName:String, ProductCategory:String, Price:Float, Rating:Float)
+
+// Converting DataFrame to RDD using the defined case class
 val productRDD = productDF.as[ProductClass].rdd
- 
-// -------------
-  
+
+// --------------
+
+// Directly loading the data from .csv -> USE :paste
 val trafficCSVData = spark.read
-	.option("header","true")
-	.option("inferSchema","true")
-	.csv("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Website traffic and user behavior.csv")
-	.toDF()
-	
+    .option("header","true")
+    .option("inferSchema","true")
+    .csv("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Website traffic and user behavior.csv")
+
+// Clearning Phase -> USE :paste
 val trafficDF = trafficCSVData.withColumn("Date", to_date($"Date"))
-	
+
+// Creating SQL View
 trafficDF.createTempView("traffics");
 
+// Creating CaseClass to properly load RDD
 case class TrafficClass(Date:Date, PageViews:Int, UniqueVisitors:Int, BounceRate:Int, SessionDuration:Int)
 
+// Converting DataFrame to RDD using the defined case class
 val trafficRDD = trafficDF.as[TrafficClass].rdd
 
-// -------------
+// --------------
 
+// SAMPLE PRINT
 customerDF.printSchema
 productDF.printSchema
 trafficDF.printSchema
@@ -77,6 +93,396 @@ trafficDF.printSchema
 customerRDD.take(5)
 productRDD.take(5)
 trafficRDD.take(5)
+
+// --------------
+
+// 1.
+val pairedCustomer_Q1 = customerRDD.map(row => (row.ProductID, row))
+val pairedproduct_Q1 = productRDD.map(row => (row.ProductID, row))
+val joinedRDD_Q1 = pairedCustomer_Q1.join(pairedproduct_Q1)
+
+val ans_Q1 = joinedRDD_Q1.map ( 
+    row => ( 
+        row._2._2.Price - (row._2._1.DiscountApplied / 100 *  row._2._2.Price)
+    ) 
+).reduce(_+_)
+
+println("==Output Spark Core Q1==\nTotal Revenue: " + ans_Q1)
+
+// ================================================================ //
+==Output Spark Core Q1==
+Total Revenue: 24294.285
+// ================================================================ //
+
+// --------------
+
+// 2.
+val pairedCustomer_Q2 = customerRDD.map(row => (row.ProductID, row))
+val pairedproduct_Q2 = productRDD.map(row => (row.ProductID, row))
+val joinedRDD_Q2 = pairedCustomer_Q2.join(pairedproduct_Q2)
+
+// USE :paste
+val ans_Q2 = joinedRDD_Q2.map ( 
+    row => ( 
+        row._2._1.DiscountApplied / 100 *  row._2._2.Price
+    ) 
+).reduce(_+_)
+
+println("==Output Spark Core Q2==\nTotal Discount: " + ans_Q2)
+
+// ================================================================ //
+==Output Spark Core Q2==
+Total Discount: 4465.3135
+// ================================================================ //
+
+// 3.
+// Mismatch as I am subtracting discount from price
+val pairedCustomer_Q3 = customerRDD.map(row => (row.ProductID, row))
+val pairedproduct_Q3 = productRDD.map(row => (row.ProductID, row))
+val joinedRDD_Q3 = pairedCustomer_Q3.join(pairedproduct_Q3)
+
+// USE :paste
+val ans_Q3 = joinedRDD_Q3
+    .map ( 
+        row => ( 
+            row._2._2.ProductCategory, (row._2._2.Price - (row._2._1.DiscountApplied / 100 * row._2._2.Price))
+        ) 
+    )
+    .groupByKey()
+    .mapValues(
+        row => {
+            row.sum.toDouble / row.size
+        }
+    )
+
+println("==Output Spark Core Q3==")
+ans_Q3.foreach(println)
+
+// ================================================================ //
+==Output Spark Core Q3==
+(Outdoor Gear,227.23101806640625)
+(Food,5.037233352661133)
+(Fashion,119.06563568115234)
+(Bedding,75.360595703125)
+(Food and Beverages,12.37677001953125)
+(Clothing,72.07220928485577)
+(Appliances,187.32047119140626)
+(Home Decor,61.5664794921875)
+(Electronics,519.8472806490385)
+(Beauty,31.520730590820314)
+(Outdoors,148.6279296875)
+(Sports,59.427940368652344)
+(Home,17.90948944091797)
+// ================================================================ //
+
+// 4.
+val highestBounceRate = trafficRDD.map(row=>row.BounceRate).max()
+
+val ans_Q4 = trafficRDD
+    .filter {
+        row => (row.BounceRate == highestBounceRate)
+    }
+    .map {
+        row => row.Date
+    }
+
+println("==Output Spark Core Q4==\nDates with highest Bounce Rate")
+ans_Q4.foreach(println)
+
+// ================================================================ //
+==Output Spark Core Q4==
+Dates with highest Bounce Rate
+2022-01-26
+2022-10-26
+2023-02-06
+2023-02-24
+2023-02-10
+2021-10-09
+2023-01-07
+2021-03-09
+2022-08-27
+2022-09-07
+2021-07-08
+// ================================================================ //
+
+// 5.
+val ans_Q5 = productRDD
+    .map(
+        row => (row.ProductCategory, row.Rating)
+    )
+    .groupByKey()
+    .mapValues(
+        row => {
+            row.sum.toDouble / row.size
+        }
+    )
+    
+println("==Output Spark Core Q5==\nAverage Rating per Category")
+ans_Q5.foreach(println)
+
+// ================================================================ //
+==Output Spark Core Q5==
+Average Rating per Category
+(Outdoor Gear,4.661538344163161)
+(Food,4.199999809265137)
+(Fashion,4.633333206176758)
+(Bedding,4.800000190734863)
+(Food and Beverages,4.25714247567313)
+(Clothing,4.153846740722656)
+(Appliances,4.550000190734863)
+(Electronics,4.600000593397352)
+(Home Decor,4.064705792595358)
+(Outdoors,4.366666793823242)
+(Beauty,4.349999904632568)
+(Sports,4.349999904632568)
+(Home,3.8249998092651367)
+// ================================================================ //
+
+// 6.
+val pairedCustomer_Q6 = customerRDD.map(row => (row.ProductID, row))
+val pairedproduct_Q6 = productRDD.map(row => (row.ProductID, row))
+val joinedRDD_Q6 = pairedCustomer_Q6.join(pairedproduct_Q6)
+
+val ans_Q6 = joinedRDD_Q6
+    .map ( 
+        row => ( 
+            row._2._2.ProductCategory, 1
+        ) 
+    )
+    .reduceByKey(_+_)
+    .sortBy(-_._2)
+    .take(1)
+
+println("==Output Spark Core Q6==")
+println("Most popular product is " + ans_Q6(0)._1 + " with " + ans_Q6(0)._2 + " purchases")
+
+// ================================================================ //
+==Output Spark Core Q6==
+Most popular product is Electronics with 26 purchases
+// ================================================================ //
+
+// 7.
+val pairedCustomer_Q7 = customerRDD.map(row => (row.ProductID, row))
+val pairedproduct_Q7 = productRDD.map(row => (row.ProductID, row))
+val joinedRDD_Q7 = pairedCustomer_Q7.join(pairedproduct_Q7)
+
+val ans_Q7 = joinedRDD_Q7
+    .map ( 
+        row => ( 
+            row._2._1.CustomerID, (row._2._2.Price - (row._2._1.DiscountApplied / 100 * row._2._2.Price))
+        ) 
+    )
+    .reduceByKey(_+_)
+    .sortBy(-_._2)
+    .take(5)
+
+println("==Output Spark Core Q7==")
+ans_Q7.foreach(println)
+
+// ================================================================ //
+==Output Spark Core Q7==
+(CUST132,1424.9905)
+(CUST064,1124.9924)
+(CUST083,1109.9927)
+(CUST096,941.9921)
+(CUST006,894.991)
+// ================================================================ //
+
+// -----------------------------------------------------------------------------
+// SPARK SQL
+// -----------------------------------------------------------------------------
+
+// 1.
+val aggCategoryDF = productDF
+  .groupBy("ProductCategory")
+  .agg(round(avg("Rating"), 4).as("AvgRating"))
+
+val maxDF = aggCategoryDF.orderBy("AvgRating")
+val maxCategory = maxDF.limit(1)
+
+val minDF = aggCategoryDF.orderBy(desc("AvgRating"))
+val minCategory = minDF.limit(1)
+
+val ans_Q8 = maxCategory.union(minCategory)
+
+ans_Q8.show()
+
+// ================================================================ //
++---------------+---------+
+|ProductCategory|AvgRating|
++---------------+---------+
+|           Home|    3.825|
+|        Bedding|      4.8|
++---------------+---------+
+// ================================================================ //
+
+// 2.
+val ans_Q9 = spark.sql("SELECT CustomerID, DiscountApplied FROM customers where DiscountApplied <= 10.0")
+ans_Q9.show()
+
+// ================================================================ //
++----------+---------------+
+|CustomerID|DiscountApplied|
++----------+---------------+
+|   CUST001|            5.0|
+|   CUST003|            8.5|
+|   CUST005|            4.0|
+|   CUST011|            6.0|
+|   CUST012|            9.0|
+|   CUST017|            5.5|
+|   CUST018|           10.0|
+|   CUST021|            8.0|
+|   CUST023|            3.5|
+|   CUST029|            7.0|
+|   CUST031|            3.0|
+|   CUST033|            9.0|
+|   CUST038|            5.0|
+|   CUST039|            9.0|
+|   CUST043|            2.0|
+|   CUST047|            8.5|
+|   CUST051|            9.5|
+|   CUST053|            3.5|
+|   CUST055|            3.5|
+|   CUST056|            9.5|
++----------+---------------+
+only showing top 20 rows
+// ================================================================ //
+
+// 3.
+val ans_Q10 = spark.sql("SELECT Date, ROUND(AVG(SessionDuration), 4) as AverageSession FROM traffics GROUP BY Date")
+ans_Q10.show()
+
+// ================================================================ //
++----------+--------------+
+|      Date|AverageSession|
++----------+--------------+
+|2022-03-28|         163.0|
+|2021-06-22|         195.0|
+|2021-08-27|      161.3333|
+|2021-12-18|         147.5|
+|2021-11-13|          99.5|
+|2022-07-31|          66.0|
+|2021-10-11|         102.0|
+|2021-01-27|         135.0|
+|2021-10-02|          74.5|
+|2021-11-25|         140.5|
+|2022-07-27|         193.0|
+|2022-12-25|      112.3333|
+|2022-11-29|         242.0|
+|2023-02-25|         199.0|
+|2022-01-31|          99.0|
+|2021-04-29|         231.0|
+|2021-07-30|         163.0|
+|2022-05-26|         168.0|
+|2022-01-29|         105.0|
+|2022-06-22|         108.0|
++----------+--------------+
+only showing top 20 rows
+// ================================================================ //
+
+// 4.
+val highestRating = productDF.groupBy("ProductCategory").agg(max("RATING").as("RATING"))
+
+val ans_Q11 = productDF
+	.join(highestRating, Seq("ProductCategory", "RATING"))
+	.select("ProductID", "ProductName", "ProductCategory", "Rating")
+
+ans_Q11.show()
+
+// ================================================================ //
++---------+---------------+------------------+------+
+|ProductID|    ProductName|   ProductCategory|Rating|
++---------+---------------+------------------+------+
+|   PRD017|       CozyNest|              Home|   4.1|
+|   PRD014|  GoldenHarvest|              Food|   4.3|
+|   PRD016|ClassicElegance|           Fashion|   4.7|
+|   PRD002|     MightyGrip|            Sports|   4.5|
+|   PRD098|      TechSavvy|       Electronics|   4.9|
+|   PRD088|     TechLuxury|       Electronics|   4.9|
+|   PRD076|      TechElite|       Electronics|   4.9|
+|   PRD066|        TechPro|       Electronics|   4.9|
+|   PRD062|     TechXtreme|       Electronics|   4.9|
+|   PRD031|       TechZone|       Electronics|   4.9|
+|   PRD018|   AdventurePro|          Outdoors|   4.5|
+|   PRD090|     CozyHoodie|          Clothing|   4.6|
+|   PRD033|   HealthyBites|Food and Beverages|   4.7|
+|   PRD025|      CloudNine|           Bedding|   4.8|
+|   PRD019|     SoftDreams|           Bedding|   4.8|
+|   PRD010|   EliteComfort|           Bedding|   4.8|
+|   PRD013|     PowerBoost|        Appliances|   4.9|
+|   PRD065|    CozyCushion|        Home Decor|   4.5|
+|   PRD027|       SilkGlow|            Beauty|   4.7|
+|   PRD045|  AdventureGear|      Outdoor Gear|   4.9|
++---------+---------------+------------------+------+
+// ================================================================ //
+
+// 5.
+val ans_Q12 = productDF
+    .join(customerDF, Seq("ProductID"))
+    .groupBy("ProductCategory").agg(round(avg($"Price" * ($"DiscountApplied"/100)), 4).as("AvgDiscountApplied"))
+	
+ans_Q12.show()
+
+// ================================================================ //
++------------------+------------------+
+|   ProductCategory|AvgDiscountApplied|
++------------------+------------------+
+|              Home|            0.8805|
+|              Food|            0.2861|
+|           Fashion|            8.4244|
+|            Sports|            3.0621|
+|       Electronics|          108.6042|
+|          Outdoors|            6.3621|
+|          Clothing|           12.5332|
+|Food and Beverages|            3.1132|
+|           Bedding|            4.6294|
+|        Appliances|            8.6695|
+|        Home Decor|           10.4235|
+|            Beauty|            2.4693|
+|      Outdoor Gear|           43.5923|
++------------------+------------------+
+// ================================================================ //
+
+// 6.
+val ans_Q13 = productDF
+	.join(customerDF, Seq("ProductID"))
+	.groupBy("ProductID", "ProductName")
+	.agg(round(sum($"Price" - ($"Price" * ($"DiscountApplied"/100))), 4).as("TotalRevenue"))
+	.orderBy($"TotalRevenue".desc)
+	.limit(10)
+
+ans_Q13.show()
+
+// ================================================================ //
++---------+------------+------------+
+|ProductID| ProductName|TotalRevenue|
++---------+------------+------------+
+|   PRD088|  TechLuxury|   3659.9756|
+|   PRD037|   TechTrend|   1784.9821|
+|   PRD081|  TechMaster|   1430.9761|
+|   PRD062|  TechXtreme|   1403.9824|
+|   PRD042|  SmartSense|   1067.9733|
+|   PRD066|     TechPro|    941.9921|
+|   PRD086|HighAltitude|    917.9847|
+|   PRD076|   TechElite|    789.9921|
+|   PRD064| SnowySlopes|    770.9743|
+|   PRD013|  PowerBoost|    719.9712|
++---------+------------+------------+
+// ================================================================ //
+
+// 7.
+val ans_Q14 = spark.sql("SELECT AVG(BounceRate) FROM traffics WHERE Month(Date)=3 AND Year(Date)=2022")
+
+// Output
+ans_Q14.show()
+
+// ================================================================ //
++-----------------+
+|  avg(BounceRate)|
++-----------------+
+|49.60526315789474|
++-----------------+
+// ================================================================ //
 
 
 =====================================================PY SPARK=====================================================
@@ -88,39 +494,81 @@ pyspark --jars "C:\Users\abhinav.kumar62\Downloads\spark-excel_2.12-3.5.1_0.20.4
 
 // -------------
 
-from pyspark.sql.functions import to_date, col
+// Import necessary libraries for handling dates and Spark SQL functions
+from pyspark.sql.functions import to_date, col, month, year, round, sum, avg
+from datetime import date
+import calendar
 
 // -------------
 
-customerExcelData = spark.read.format("com.crealytics.spark.excel").option("header", "true").option("inferSchema", "true").load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
+// Loading data from Excel sheet
+customerExcelData = (spark.read
+    .format("com.crealytics.spark.excel")
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Customer Purchase History.xlsx")
+)
 
-customerDF = customerExcelData.withColumnRenamed("Customer ID", "CustomerID").withColumn("PurchaseDate", to_date("Purchase Date")).drop("Purchase Date").withColumnRenamed("Product ID", "ProductID").withColumnRenamed("Discount Applied", "DiscountApplied")
+// Clearning Phase
+customerDF = (customerExcelData
+    .withColumnRenamed("Customer ID", "CustomerID")
+    .withColumn("PurchaseDate", to_date("Purchase Date")).drop("Purchase Date")
+    .withColumnRenamed("Product ID", "ProductID")
+    .withColumn("DiscountApplied", col("Discount Applied").cast("float")).drop("Discount Applied")
+)
 
+// Creating SQL View
 customerDF.createTempView("customers");
 
+// Converting DataFrame to RDD
 customerRDD = customerDF.rdd
 
 // -------------
 
-productExcelData = spark.read.format("com.crealytics.spark.excel").option("header", "true").option("inferSchema", "true").load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
+// Loading data from Excel sheet
+productExcelData = (spark.read
+    .format("com.crealytics.spark.excel")
+    .option("header", "true")
+    .option("inferSchema", "true")
+    .load("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Product Catalog.xlsx")
+)
 
-productDF = productExcelData.withColumnRenamed("Product ID", "ProductID").withColumnRenamed("Product Name", "ProductName").withColumnRenamed("Product Category", "ProductCategory").withColumnRenamed("Discount Applied", "DiscountApplied")
+// Clearning Phase
+productDF = (productExcelData
+    .withColumnRenamed("Product ID", "ProductID")
+    .withColumnRenamed("Product Name", "ProductName")
+    .withColumnRenamed("Product Category", "ProductCategory")
+    .withColumnRenamed("Discount Applied", "DiscountApplied")
+    .withColumn("Price", col("Price").cast("Float"))
+    .withColumn("Rating", col("Rating").cast("Float"))
+)
 
+// Creating SQL View
 productDF.createTempView("products");
-	
+
+// Converting DataFrame to RDD
 productRDD = productDF.rdd
 
 // -------------
 
-trafficCSVData = spark.read.option("header","true").option("inferSchema","true").csv("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Website traffic and user behavior.csv")
-	
+// Directly loading the data from .csv
+trafficCSVData = (spark.read
+    .option("header","true")
+    .option("inferSchema","true")
+    .csv("C:/Users/abhinav.kumar62/Downloads/CapstoneProject_FA3_1/Spark Dataset/Website traffic and user behavior.csv")
+)
+
+// Clearning Phase
 trafficDF = trafficCSVData.withColumn("Date", to_date("Date"))
-	
+
+// Creating SQL View
 trafficDF.createTempView("traffics");
 
+// Converting DataFrame to RDD
 trafficRDD = trafficDF.rdd
 
 // -------------
+// SAMPLE PRINT
 
 customerDF.printSchema
 productDF.printSchema
@@ -129,3 +577,254 @@ trafficDF.printSchema
 customerRDD.take(5)
 productRDD.take(5)
 trafficRDD.take(5)
+
+// -------------
+1.
+ans = (trafficRDD
+    .filter(lambda row: row["Date"].year == 2021)
+    .map(lambda row: (row["Date"].month, (row["SessionDuration"], 1)))
+    .reduceByKey(lambda x, y : (x[0] + y[0], x[1] + y[1]))
+    .mapValues(lambda x :
+        x[0] / x[1] 
+    )
+)
+
+for row in ans.collect():
+    print("Average on month " + str(row[0]) + " is " + str(row[1]))
+    
+// ================================================================ //
+Average on month 7 is 151.83783783783784
+Average on month 8 is 156.03030303030303
+Average on month 5 is 152.88571428571427
+Average on month 6 is 161.48888888888888
+Average on month 3 is 150.4181818181818
+Average on month 1 is 132.02777777777777
+Average on month 10 is 137.025
+Average on month 4 is 127.125
+Average on month 11 is 132.4181818181818
+Average on month 12 is 126.6046511627907
+Average on month 9 is 156.65625
+Average on month 2 is 112.30434782608695
+// ================================================================ //
+
+2.
+ans = (trafficRDD
+	.map(lambda row: (row["Date"], row["UniqueVisitors"]))
+	.reduceByKey(lambda row1,row2: row1 + row2).sortBy(lambda row: row[1], False)
+	.take(1)
+)
+
+print(ans[0][0].strftime("%d-%m-%Y") + " recorded highest unique visitors of " + str(ans[0][1]))
+
+// ================================================================ //
+23-01-2022 recorded highest unique visitors of 14668
+// ================================================================ //
+
+3.
+pairedTraffic = trafficRDD.map(lambda row: (row["Date"], (row["PageViews"], row["UniqueVisitors"], row["BounceRate"], row["SessionDuration"])))
+
+ans = pairedTraffic.reduceByKey(lambda row1, row2: (row1[0]+row2[0], row1[1]+row2[1], row1[2]+row2[2], row1[3]+row2[3]) )
+
+for row in ans.collect():
+    print(row[0].strftime("%d-%m-%y")+"\t"+str(row[1][0])+"\t"+str(row[1][1])+"\t"+str(row[1][2])+"\t"+str(row[1][3]))
+    
+// ================================================================ //
+12-10-21        5722    1638    6       246
+06-12-21        1748    789     9       191
+12-03-22        3619    3682    88      240
+19-08-21        1408    4959    54      30
+01-11-22        527     2566    34      167
+03-02-23        4518    83      32      40
+05-08-21        4227    3327    50      114
+23-04-22        5827    141     31      39
+16-03-23        8755    3335    80      105
+18-05-22        8333    3859    134     342
+21-11-22        14380   2603    75      408
+18-03-21        3999    4214    76      111
+05-09-21        6694    2026    10      73
+06-10-22        8743    5203    91      262
+20-01-22        6959    1822    53      53
+10-12-22        4050    164     17      101
+25-07-21        4691    1244    84      163
+24-12-22        5505    1247    36      133
+16-10-21        7825    2316    42      178
+16-03-22        9360    4267    53      226
+14-02-22        5282    4549    66      126
+19-08-22        5427    3698    50      224
+18-04-22        6089    201     79      98
+02-09-21        860     3272    40      163
+08-07-21        4989    1792    90      239
+26-03-23        5351    4068    76      111
+07-06-22        2606    4155    10      131
+28-09-21        9516    2975    26      245
+// ================================================================ //
+
+4.
+filteredCustomerRDD = customerRDD.filter(lambda row: row["PurchaseDate"] == date(2020, 6, 13))
+
+for row in filteredCustomerRDD.collect():
+    print(row)
+    
+// ================================================================ //
+Row(CustomerID='CUST027', ProductID='PRD083', PurchaseDate=datetime.date(2020, 6, 13), DiscountApplied=32.0)
+Row(CustomerID='CUST055', ProductID='PRD003', PurchaseDate=datetime.date(2020, 6, 13), DiscountApplied=3.5)
+Row(CustomerID='CUST083', ProductID='PRD088', PurchaseDate=datetime.date(2020, 6, 13), DiscountApplied=26.0)
+Row(CustomerID='CUST111', ProductID='PRD018', PurchaseDate=datetime.date(2020, 6, 13), DiscountApplied=3.5)
+// ================================================================ //
+    
+5.
+filteredProductRDD = productRDD.filter(lambda row: row["ProductCategory"] == "Electronics").sortBy(lambda row: row["Price"])
+
+for row in filteredProductRDD.collect():
+    print(row)
+
+// ================================================================ //
+Row(ProductID='PRD015', ProductName='SwiftCharge', ProductCategory='Electronics', Price=69.98999786376953, Rating=4.400000095367432)
+Row(ProductID='PRD006', ProductName='TrueCharge', ProductCategory='Electronics', Price=119.98999786376953, Rating=4.0)
+Row(ProductID='PRD053', ProductName='SmartWatch', ProductCategory='Electronics', Price=149.99000549316406, Rating=4.5)
+Row(ProductID='PRD058', ProductName='SmartHome', ProductCategory='Electronics', Price=149.99000549316406, Rating=4.400000095367432)
+Row(ProductID='PRD001', ProductName='SuperDuper', ProductCategory='Electronics', Price=189.99000549316406, Rating=4.199999809265137)
+Row(ProductID='PRD083', ProductName='SmartCam', ProductCategory='Electronics', Price=199.99000549316406, Rating=4.099999904632568)
+Row(ProductID='PRD071', ProductName='SmartPad', ProductCategory='Electronics', Price=349.989990234375, Rating=4.699999809265137)
+Row(ProductID='PRD042', ProductName='SmartSense', ProductCategory='Electronics', Price=399.989990234375, Rating=4.699999809265137)
+Row(ProductID='PRD093', ProductName='SmartGadget', ProductCategory='Electronics', Price=399.989990234375, Rating=4.300000190734863)
+Row(ProductID='PRD081', ProductName='TechMaster', ProductCategory='Electronics', Price=599.989990234375, Rating=4.699999809265137)
+Row(ProductID='PRD047', ProductName='TechSavvy', ProductCategory='Electronics', Price=699.989990234375, Rating=4.800000190734863)
+Row(ProductID='PRD031', ProductName='TechZone', ProductCategory='Electronics', Price=799.989990234375, Rating=4.900000095367432)
+Row(ProductID='PRD062', ProductName='TechXtreme', ProductCategory='Electronics', Price=799.989990234375, Rating=4.900000095367432)
+Row(ProductID='PRD098', ProductName='TechSavvy', ProductCategory='Electronics', Price=799.989990234375, Rating=4.900000095367432)
+Row(ProductID='PRD037', ProductName='TechTrend', ProductCategory='Electronics', Price=999.989990234375, Rating=4.599999904632568)
+Row(ProductID='PRD076', ProductName='TechElite', ProductCategory='Electronics', Price=999.989990234375, Rating=4.900000095367432)
+Row(ProductID='PRD066', ProductName='TechPro', ProductCategory='Electronics', Price=1199.989990234375, Rating=4.900000095367432)
+Row(ProductID='PRD088', ProductName='TechLuxury', ProductCategory='Electronics', Price=1499.989990234375, Rating=4.900000095367432)
+// ================================================================ //
+
+// -------------
+PySpark SQL
+
+1.
+newDF = (customerDF
+    .join(productDF, on=["ProductID"])
+    .withColumn("AmountPaid", round(col("Price") - (col("Price") * (col("DiscountApplied") / 100)), 4) )
+    .select("CustomerID", "PurchaseDate", "ProductName", "ProductCategory", "AmountPaid")
+)
+
+newDF.show();
+
+// ================================================================ //
++----------+------------+---------------+------------------+----------+
+|CustomerID|PurchaseDate|    ProductName|   ProductCategory|AmountPaid|
++----------+------------+---------------+------------------+----------+
+|   CUST139|  2022-03-18|        SkyHigh|      Outdoor Gear|  140.2407|
+|   CUST075|  2021-02-05|        SkyHigh|      Outdoor Gear|  137.2409|
+|   CUST047|  2021-02-05|        SkyHigh|      Outdoor Gear|  137.2409|
+|   CUST012|  2021-09-28|        SkyHigh|      Outdoor Gear|  136.4909|
+|   CUST098|  2021-07-30|  Oceanic Waves|        Home Decor|   95.4904|
+|   CUST056|  2020-05-14|  Oceanic Waves|        Home Decor|   90.4909|
+|   CUST039|  2021-10-27|  Oceanic Waves|        Home Decor|   90.9909|
+|   CUST060|  2022-05-20|       HappyDay|              Home|   25.3402|
+|   CUST102|  2021-03-04|FlavorFiesta XL|Food and Beverages|   21.3664|
+|   CUST041|  2021-08-29|FlavorFiesta XL|Food and Beverages|   21.2415|
+|   CUST087|  2022-06-17|  GoldenHarvest|              Food|    5.8103|
+|   CUST011|  2021-10-27|  GoldenHarvest|              Food|    5.6306|
+|   CUST129|  2022-09-23|      CloudNine|           Bedding|   93.9906|
+|   CUST113|  2022-06-17|       TrueGlow|            Beauty|    35.991|
+|   CUST122|  2022-03-19|     DreamShine|          Clothing|   74.3907|
+|   CUST108|  2020-09-10|  AdventureGear|      Outdoor Gear|  170.9915|
+|   CUST090|  2022-03-22|  AdventureGear|      Outdoor Gear|  172.9914|
+|   CUST049|  2020-12-07|  AdventureGear|      Outdoor Gear|  174.9913|
+|   CUST137|  2022-12-05|     OceanSpray|              Food|    3.6708|
+|   CUST057|  2022-08-01|    SwiftCharge|       Electronics|   65.7906|
++----------+------------+---------------+------------------+----------+
+only showing top 20 rows
+// ================================================================ //
+
+2.
+newDF = customerDF.join(productDF, on=["ProductID"]).filter(col("PurchaseDate") == date(2020, 6, 13))
+
+newDF.createTempView("customer_purchases");
+
+ans = spark.sql("SELECT PurchaseDate, round(SUM(Price - (Price * (DiscountApplied / 100))), 4) as TotalRevenue FROM customer_purchases GROUP BY PurchaseDate")
+
+ans.show()
+
+// ================================================================ //
++------------+------------+
+|PurchaseDate|TotalRevenue|
++------------+------------+
+|  2020-06-13|   1451.5115|
++------------+------------+
+// ================================================================ //
+
+3.
+newDF = (customerDF
+    .join(productDF, on=["ProductID"])
+    .join(trafficDF, col("Date") == col("PurchaseDate"))
+    .filter(col("UniqueVisitors") >= 250)
+    .withColumn("AmountPaid", col("Price") - (col("Price") * (col("DiscountApplied") / 100)))
+    .groupBy("ProductID", "ProductName").agg(round(sum("AmountPaid"), 4).alias("TotalRevenue"))
+)
+
+newDF.show()
+
+// ================================================================ //
++---------+---------------+------------+
+|ProductID|    ProductName|TotalRevenue|
++---------+---------------+------------+
+|   PRD030|        SkyHigh|    410.9726|
+|   PRD029|  Oceanic Waves|    377.4622|
+|   PRD008|       HappyDay|     50.6805|
+|   PRD048|FlavorFiesta XL|     21.3664|
+|   PRD014|  GoldenHarvest|     17.2512|
+|   PRD025|      CloudNine|    187.9812|
+|   PRD021|       TrueGlow|      71.982|
+|   PRD039|     DreamShine|     74.3907|
+|   PRD045|  AdventureGear|    172.9914|
+|   PRD050|     BrightLuxe|     67.1832|
+|   PRD002|     MightyGrip|     97.2306|
+|   PRD037|      TechTrend|     894.991|
+|   PRD028|     SuperJuice|    140.2407|
+|   PRD046|      SoftTouch|    147.1816|
+|   PRD011|     AquaShield|     13.7908|
+|   PRD009|     AllSeasons|    437.2209|
+|   PRD049|      ZenLounge|     254.983|
+|   PRD023|     DiamondCut|    274.4817|
+|   PRD007|       SwiftRun|    307.1616|
+|   PRD032|      RetroGlow|    112.4813|
++---------+---------------+------------+
+// ================================================================ //
+
+4.
+ans = productDF.filter(col("ProductCategory") == "Clothing").groupBy("ProductCategory").agg(round(avg("Rating"), 4))
+
+ans.show()
+
+// ================================================================ //
++---------------+---------------------+
+|ProductCategory|round(avg(Rating), 4)|
++---------------+---------------------+
+|       Clothing|               4.1538|
++---------------+---------------------+
+// ================================================================ //
+
+5.
+newDF = (customerDF
+    .join(productDF, on=["ProductID"])
+    .filter( (month(col("PurchaseDate")) == 12) & (year(col("PurchaseDate")) == 2021))
+    .withColumn("AmountPaid", round(col("Price") - (col("Price") * (col("DiscountApplied") / 100)), 4) )
+    .orderBy(col("AmountPaid").desc())
+    .limit(10)
+)
+
+newDF.show();
+
+// ================================================================ //
++---------+----------+------------+---------------+---------------+------------------+------+------+----------+
+|ProductID|CustomerID|PurchaseDate|DiscountApplied|    ProductName|   ProductCategory| Price|Rating|AmountPaid|
++---------+----------+------------+---------------+---------------+------------------+------+------+----------+
+|   PRD096|   CUST009|  2021-12-25|           25.0|AlpineAdventure|      Outdoor Gear|299.99|   4.7|  224.9925|
+|   PRD058|   CUST065|  2021-12-25|           16.5|      SmartHome|       Electronics|149.99|   4.4|  125.2417|
+|   PRD080|   CUST093|  2021-12-25|           23.5|     AquaLuxury|        Home Decor|149.99|   4.2|  114.7424|
+|   PRD059|   CUST037|  2021-12-25|           17.5|      SweetSips|Food and Beverages|  8.99|   3.9|    7.4167|
++---------+----------+------------+---------------+---------------+------------------+------+------+----------+
+// ================================================================ //
