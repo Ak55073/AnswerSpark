@@ -175,60 +175,39 @@ ans_Q3.foreach(println)
 (Home,17.90948944091797)
 // ================================================================ //
 
-// 4.
-val highestBounceRate = trafficRDD.map(row=>row.BounceRate).max()
+// 4
+val groupedBounceRate = trafficRDD
+    .map(row => (row.Date, row.BounceRate))
+    .groupByKey()  
+    .mapValues(
+        row => {
+            row.sum.toDouble / row.size
+        }
+    )
+    .sortBy(_._2, false)
 
-val ans_Q4 = trafficRDD
+val highestBounceRate = groupedBounceRate.first()._2
+
+val ans_Q4 = groupedBounceRate
     .filter {
-        row => (row.BounceRate == highestBounceRate)
+        row => (row._2 == highestBounceRate)
     }
     .map {
-        row => row.Date
+        row => row._1  // Mapping to get only the date
     }
 
 println("==Output Spark Core Q4==\nDates with highest Bounce Rate of: " + highestBounceRate)
-ans_Q4.foreach(println)
-
------ALTERNATE-----
-
-val correctedBounceRate = trafficRDD
-	.map(row=>(row.Date, row.BounceRate))
-	.reduceByKey(_+_)
-	.sortBy(_._2, false)
-
-val highestBounceRateAlt = correctedBounceRate.first()._2
-
-val ans_Q4_alt = correctedBounceRate
-    .filter {
-        row => (row._2 == highestBounceRateAlt)
-    }
-    .map {
-        row => row._1
-    }
-
-println("==Output Spark Core Q4 ALT==\nDates with highest Bounce Rate of: " + highestBounceRateAlt)
-ans_Q4_alt.foreach(println)
+ans_Q4.foreach(println)  // Printing each date that has the highest average bounce rate
 
 // ================================================================ //
 ==Output Spark Core Q4==
-Dates with highest Bounce Rate of: 90
-2022-01-26
-2022-10-26
-2023-02-06
-2023-02-24
-2023-02-10
-2021-10-09
-2023-01-07
-2021-03-09
-2022-08-27
-2022-09-07
+Dates with highest Bounce Rate of: 90.0
 2021-07-08
-// ================================================================ //
-
-// ================================================================ //
-==Output Spark Core Q4 ALT==
-Dates with highest Bounce Rate of: 306
-2021-08-15
+2022-08-27
+2022-10-26
+2023-02-10
+2022-01-26
+2022-09-07
 // ================================================================ //
 
 // 5.
